@@ -1,0 +1,9 @@
+version: '3.8'
+
+services:
+  web:
+    image: ledjam/univ-prueba:lastest #repositorio docker hub
+    container_name: univ-prueba
+    ports:
+      - "80:80" #mapear puerto 80 del contenedor al puerto 80 del host
+    restart: always
