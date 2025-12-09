@@ -4,6 +4,9 @@ on:
     branches:
       - main
 
+env:
+  NOTIFICATION_EMAIL: diegomelna14@gmail.com
+
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
@@ -23,64 +26,23 @@ jobs:
       - name: Publicar la imagen Docker
         run: docker push ${{ secrets.DOCKER_USER }}/univ-prueba:latest
 
-  deploy:
-    needs: build-and-push
+  notify:
+    name: Send Notification
     runs-on: ubuntu-latest
-
+    needs: build-and-push
+    if: always()
     steps:
-      - name: Checkout del código (obtener docker-compose.yml, setup_vm.sh)
-        uses: actions/checkout@v5
-
-      # 1 configurar acceso ssh
-      - name: Configurar agente SSH
-        uses: webfactory/ssh-agent@v0.9.0
+      - name: Send Success Email
+        if: success()
+        uses: dawidd6/action-send-mail@v3
         with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-
-      # 2 copiar script de configuración a la VM
-      - name: Copiar script de configuración a la VM
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "setup_vm.sh"
-          target: "/tmp/"
-
-      # 3 ejecutar script de configuración en la VM
-      - name: Ejecutar script de instalación en la VM
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            chmod +x /tmp/setup_vm.sh
-            /tmp/setup_vm.sh ${{ secrets.SSH_USER }}
-            rm /tmp/setup_vm.sh  # eliminar script por seguridad
-
-      # 4 copiar docker-compose.yml a la VM
-      - name: Copiar docker-compose.yml a la VM
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "docker-compose.yml"
-          target: "/home/${{ secrets.SSH_USER }}/deploy/"
-
-      # 5 ejecutar docker-compose en la VM
-      - name: Ejecutar docker-compose en la VM
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            DEPLOY_PATH="/home/${{ secrets.SSH_USER }}/deploy"
-            cd $DEPLOY_PATH
-
-            echo ${{ secrets.DOCKER_PASSWORD }} | sudo docker login -u ${{ secrets.DOCKER_USER }} --password-stdin
-            sudo docker-compose pull
-            sudo docker-compose up -d --force-recreate
-            sudo docker logout
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: "✅ Despliegue Exitoso"
+          to: ${{ env.NOTIFICATION_EMAIL }}
+          from: GitHub Actions
+          body: |
+            ✅ El despliegue se completó exitosamente!
+            
